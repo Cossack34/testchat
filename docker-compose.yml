@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ChatAppDb
+      POSTGRES_USER: chatapp_user
+      POSTGRES_PASSWORD: chatapp_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=ChatAppDb;Username=chatapp_user;Password=chatapp_password;Include Error Detail=true
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__Secret=flXFXwOA/qMM1wZU3IO/DR9vjg5C2sLFuUq9OLwzZ8k=
+      - Jwt__Issuer=ChatApp
+      - Jwt__Audience=ChatApp
+      - Jwt__ExpirationInMinutes=1440
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=https://localhost:3001
+      - Cors__AllowedOrigins__2=http://localhost:8080
+volumes:
+  postgres_data:

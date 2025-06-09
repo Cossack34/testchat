@@ -1,0 +1,107 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>SignalR Test Client</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            background: #181818;
+            color: #eee;
+        }
+
+        #log {
+            background: #222;
+            color: #9eea6a;
+            padding: 1em;
+            height: 300px;
+            overflow-y: auto;
+        }
+
+        #controls {
+            margin-bottom: 1em;
+        }
+
+        input, button {
+            font-size: 1em;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input id="tokenInput" type="text" placeholder="JWT token" size="48" />
+        <input id="chatIdInput" type="text" placeholder="Chat ID (GUID)" size="36" />
+        <button onclick="connect()">Connect</button>
+    </div>
+    <div>
+        <input id="messageInput" type="text" placeholder="Message" size="40" />
+        <button onclick="send()">Send</button>
+    </div>
+    <pre id="log"></pre>
+
+    <script>
+        let connection = null;
+        let connected = false;
+
+        function log(text) {
+            document.getElementById("log").textContent += text + "\n";
+        }
+
+        function connect() {
+            const token = document.getElementById("tokenInput").value.trim();
+            const chatId = document.getElementById("chatIdInput").value.trim();
+
+            if (!token || !chatId) {
+                log("Fill JWT token and chat ID first!");
+                return;
+            }
+
+            if (connection) {
+                connection.stop();
+                connection = null;
+                connected = false;
+            }
+
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl("http://localhost:5000/hubs/chat", { accessTokenFactory: () => token })
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            connection.on("ReceiveMessage", function (msg) {
+                log("New message: " + JSON.stringify(msg));
+            });
+
+            connection.on("UserJoined", function (info) {
+                log("User joined: " + JSON.stringify(info));
+            });
+
+            connection.onclose(function (error) {
+                log("Disconnected: " + (error ? error.toString() : "Connection closed"));
+                connected = false;
+            });
+
+            connection.start().then(function () {
+                connected = true;
+                log("Connected!");
+                connection.invoke("JoinChat", chatId);
+            }).catch(function (err) {
+                log("Connection failed: " + err.toString());
+            });
+        }
+
+        function send() {
+            if (!connected || !connection) {
+                log("Connect first!");
+                return;
+            }
+            const chatId = document.getElementById("chatIdInput").value.trim();
+            const content = document.getElementById("messageInput").value;
+            if (!content) return;
+            connection.invoke("SendMessage", chatId, content)
+                .then(() => log("Sent: " + content))
+                .catch(err => log("Send failed: " + err));
+        }
+    </script>
+</body>
+</html>
